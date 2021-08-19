@@ -1,3 +1,4 @@
+#![no_std]
 //Copyright (c) 2020 Marco Boneberger
 /*!
 *  s_curve
@@ -9,27 +10,29 @@
 *
 * The notation follows loosely the book
 * "Trajectory Planning for Automatic Machinesand Robots" by Luigi Biagotti and Claudio Melchiorri
-*  # Example
-*  ```rust
-*  use s_curve::*;
-*  let constraints = SCurveConstraints {
-*              max_jerk: 3.,
-*              max_acceleration: 2.0,
-*              max_velocity: 3.};
-*          let  start_conditions = SCurveStartConditions {
-*              q0: 0., // start position
-*              q1: 10., // end position
-*              v0: 0., // start velocity
-*              v1: 0. // end velocity
-*          };
-*          let input = SCurveInput{constraints, start_conditions};
-*          let (params,s_curve) = s_curve_generator(&input,Derivative::Velocity);
-*          for i in 0..101 {
-*              println!("{}", s_curve(i as f64 * params.time_intervals.total_duration() / 100.));
-*          }
-*  ```
-*
 */
+// `no_std` f32 math implementation.
+use libm;
+
+trait F32Ext: Sized {
+    fn abs(self) -> f32;
+    fn powi(self, i: u32) -> f32;
+    fn sqrt(self) -> f32;
+}
+
+impl F32Ext for f32 {
+    fn abs(self) -> f32 {
+        libm::fabsf(self)
+    }
+
+    fn powi(self, i: u32) -> f32 {
+        libm::powf(self, i as f32)
+    }
+
+    fn sqrt(self) -> f32 {
+        libm::sqrtf(self)
+    }
+}
 
 /**
  * Struct which contains the desired limits for jerk, acceleration and velocity in SI units.
@@ -38,9 +41,9 @@
  */
 #[derive(Clone, Debug, Default)]
 pub struct SCurveConstraints {
-    pub max_jerk: f64,
-    pub max_acceleration: f64,
-    pub max_velocity: f64,
+    pub max_jerk: f32,
+    pub max_acceleration: f32,
+    pub max_velocity: f32,
 }
 
 /// Enum which is used to select whether you want to calculate
@@ -56,20 +59,20 @@ pub enum Derivative {
 #[derive(Clone, Debug, Default)]
 pub struct SCurveTimeIntervals {
     ///  time-interval in which the jerk is constant (j max or j min ) during the acceleration phase
-    pub t_j1: f64,
+    pub t_j1: f32,
     /// time-interval in which the jerk is constant (j max or j min ) during the deceleration phase
-    pub t_j2: f64,
+    pub t_j2: f32,
     ///   Acceleration period
-    pub t_a: f64,
+    pub t_a: f32,
     ///  constant velocity period
-    pub t_v: f64,
+    pub t_v: f32,
     ///   deceleration period
-    pub t_d: f64,
+    pub t_d: f32,
 }
 
 impl SCurveTimeIntervals {
     /// calculates the total duration of the S-Curve
-    pub fn total_duration(&self) -> f64 {
+    pub fn total_duration(&self) -> f32 {
         self.t_a + self.t_d + self.t_v
     }
     fn is_max_acceleration_not_reached(&self) -> bool {
@@ -81,13 +84,13 @@ impl SCurveTimeIntervals {
 #[derive(Clone, Debug)]
 pub struct SCurveStartConditions {
     /// start position
-    pub q0: f64,
+    pub q0: f32,
     /// end position
-    pub q1: f64,
+    pub q1: f32,
     ///start velocity
-    pub v0: f64,
+    pub v0: f32,
     ///end velocity
-    pub v1: f64,
+    pub v1: f32,
 }
 
 impl Default for SCurveStartConditions {
@@ -103,7 +106,7 @@ impl Default for SCurveStartConditions {
 
 impl SCurveStartConditions {
     /// displacement
-    fn h(&self) -> f64 {
+    fn h(&self) -> f32 {
         self.q1 - self.q0
     }
 }
@@ -114,15 +117,15 @@ pub struct SCurveParameters {
     /// tine intervals of the Trajectory
     pub time_intervals: SCurveTimeIntervals,
     /// maximum jerk
-    pub j_max: f64,
+    pub j_max: f32,
     /// minimum jerk
-    pub j_min: f64,
+    pub j_min: f32,
     ///maximum achieved acceleration during the acceleration phase
-    pub a_lim_a: f64,
+    pub a_lim_a: f32,
     /// minimum achieved acceleration during the deceleration phase
-    pub a_lim_d: f64,
+    pub a_lim_d: f32,
     /// maximum  achieved velocity
-    pub v_lim: f64,
+    pub v_lim: f32,
     /// The start conditions of the S-Curve
     pub conditions: SCurveStartConditions,
 }
@@ -159,9 +162,9 @@ impl SCurveInput {
     /// checks if it is actually possible to accomplish a certain trajectory. Dont trust this function
     /// too much. But if it returns yes it is certainly doable. If it returns false it can still work by reducing acceleration and velocity
     pub fn is_trajectory_feasible(&self) -> bool {
-        let t_j_star: f64 = f64::min(
-            f64::sqrt(
-                f64::abs(self.start_conditions.v1 - self.start_conditions.v0)
+        let t_j_star: f32 = f32::min(
+            f32::sqrt(
+                f32::abs(self.start_conditions.v1 - self.start_conditions.v0)
                     / self.constraints.max_jerk,
             ),
             self.constraints.max_acceleration / self.constraints.max_jerk,
@@ -172,7 +175,7 @@ impl SCurveInput {
                 > 0.5
                     * (self.start_conditions.v1 + self.start_conditions.v0)
                     * (t_j_star
-                        + f64::abs(self.start_conditions.v1 - self.start_conditions.v0)
+                        + f32::abs(self.start_conditions.v1 - self.start_conditions.v0)
                             / self.constraints.max_acceleration);
         }
         if t_j_star < self.constraints.max_acceleration / self.constraints.max_jerk {
@@ -194,7 +197,7 @@ impl SCurveInput {
         let mut times = SCurveTimeIntervals::default();
         let mut new_input = self.clone();
         if self.is_a_max_not_reached() {
-            times.t_j1 = f64::sqrt(
+            times.t_j1 = f32::sqrt(
                 (new_input.constraints.max_velocity - self.start_conditions.v0)
                     / new_input.constraints.max_jerk,
             );
@@ -207,7 +210,7 @@ impl SCurveInput {
         }
 
         if self.is_a_min_not_reached() {
-            times.t_j2 = f64::sqrt(
+            times.t_j2 = f32::sqrt(
                 (new_input.constraints.max_velocity - self.start_conditions.v1)
                     / new_input.constraints.max_jerk,
             );
@@ -265,11 +268,11 @@ impl SCurveInput {
                         * (self.start_conditions.v0 + self.start_conditions.v1));
         let t_a = (self.constraints.max_acceleration.powi(2) / self.constraints.max_jerk
             - 2. * self.start_conditions.v0
-            + f64::sqrt(delta))
+            + f32::sqrt(delta))
             / (2. * self.constraints.max_acceleration);
         let t_d = (self.constraints.max_acceleration.powi(2) / self.constraints.max_jerk
             - 2. * self.start_conditions.v1
-            + f64::sqrt(delta))
+            + f32::sqrt(delta))
             / (2. * self.constraints.max_acceleration);
         let t_v = 0.;
         SCurveTimeIntervals {
@@ -306,7 +309,7 @@ impl SCurveInput {
             times.t_d = 2. * self.start_conditions.h()
                 / (self.start_conditions.v0 + self.start_conditions.v1);
             times.t_j2 = (new_input.constraints.max_jerk * self.start_conditions.h()
-                - f64::sqrt(
+                - f32::sqrt(
                     new_input.constraints.max_jerk
                         * (new_input.constraints.max_jerk * self.start_conditions.h().powi(2)
                             + (self.start_conditions.v0 + self.start_conditions.v1).powi(2)
@@ -321,7 +324,7 @@ impl SCurveInput {
             times.t_a = 2. * self.start_conditions.h()
                 / (self.start_conditions.v0 + self.start_conditions.v1);
             times.t_j2 = (new_input.constraints.max_jerk * self.start_conditions.h()
-                - f64::sqrt(
+                - f32::sqrt(
                     new_input.constraints.max_jerk
                         * (new_input.constraints.max_jerk * self.start_conditions.h().powi(2)
                             - (self.start_conditions.v0 + self.start_conditions.v1).powi(2)
@@ -333,7 +336,8 @@ impl SCurveInput {
     }
 }
 
-fn eval_position(p: &SCurveParameters, t: f64) -> f64 {
+/// calculates the current position of the trajectory given the SCurve parameters and a time t in seconds.
+pub fn eval_position(p: &SCurveParameters, t: f32) -> f32 {
     let times = &p.time_intervals;
     if t < 0. {
         return p.conditions.q0;
@@ -369,8 +373,8 @@ fn eval_position(p: &SCurveParameters, t: f64) -> f64 {
         p.conditions.q1
     }
 }
-
-fn eval_velocity(p: &SCurveParameters, t: f64) -> f64 {
+/// calculates the current velocity of the trajectory given the SCurve parameters and a time t in seconds.
+pub fn eval_velocity(p: &SCurveParameters, t: f32) -> f32 {
     let times = &p.time_intervals;
     if t < 0. {
         return p.conditions.v0;
@@ -394,7 +398,8 @@ fn eval_velocity(p: &SCurveParameters, t: f64) -> f64 {
     }
 }
 
-fn eval_acceleration(p: &SCurveParameters, t: f64) -> f64 {
+/// calculates the current acceleration of the trajectory given the SCurve parameters and a time t in seconds.
+pub fn eval_acceleration(p: &SCurveParameters, t: f32) -> f32 {
     let times = &p.time_intervals;
     if t < 0. {
         0.
@@ -416,8 +421,8 @@ fn eval_acceleration(p: &SCurveParameters, t: f64) -> f64 {
         0.
     }
 }
-
-fn eval_jerk(p: &SCurveParameters, t: f64) -> f64 {
+/// calculates the current jerk of the trajectory given the SCurve parameters and a time t in seconds.
+pub fn eval_jerk(p: &SCurveParameters, t: f32) -> f32 {
     let times = &p.time_intervals;
     if t < times.t_j1 {
         p.j_max
@@ -436,39 +441,9 @@ fn eval_jerk(p: &SCurveParameters, t: f64) -> f64 {
     }
 }
 
-/// returns the S-Curve parameters and a function which maps time  [0,t] to Position, Velocity,
-/// Acceleration or Jerk, depending on what you set as Derivative. Note that the acceleration
-/// and velocity could be decreased if it is not possible to achieve them.
-pub fn s_curve_generator(
-    input_parameters: &SCurveInput,
-    derivative: Derivative,
-) -> (SCurveParameters, Box<dyn Fn(f64) -> f64>) {
-    let times = input_parameters.calc_intervals();
-    let params = SCurveParameters::new(&times, input_parameters);
-    let params_clone = params.clone();
-
-    match derivative {
-        Derivative::Position => (
-            params,
-            Box::new(move |t: f64| eval_position(&params_clone, t)),
-        ),
-        Derivative::Velocity => (
-            params,
-            Box::new(move |t: f64| eval_velocity(&params_clone, t)),
-        ),
-        Derivative::Acceleration => (
-            params,
-            Box::new(move |t: f64| eval_acceleration(&params_clone, t)),
-        ),
-        Derivative::Jerk => (params, Box::new(move |t: f64| eval_jerk(&params_clone, t))),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::{
-        s_curve_generator, Derivative, SCurveConstraints, SCurveInput, SCurveStartConditions,
-    };
+    use crate::{SCurveConstraints, SCurveInput, SCurveStartConditions};
 
     #[test]
     fn timings_3_9() {
@@ -488,7 +463,7 @@ mod tests {
             start_conditions,
         };
         let times = input.calc_intervals();
-        let near_equal = |a: f64, b: f64, epsilon: f64| f64::abs(a - b) < epsilon;
+        let near_equal = |a: f32, b: f32, epsilon: f32| f32::abs(a - b) < epsilon;
         assert!(near_equal(times.t_a, 0.7333, 0.001));
         assert!(near_equal(times.t_v, 1.1433, 0.001));
         assert!(near_equal(times.t_d, 0.8333, 0.001));
@@ -514,7 +489,7 @@ mod tests {
             start_conditions,
         };
         let times = input.calc_intervals();
-        let near_equal = |a: f64, b: f64, epsilon: f64| f64::abs(a - b) < epsilon;
+        let near_equal = |a: f32, b: f32, epsilon: f32| f32::abs(a - b) < epsilon;
         assert!(near_equal(times.t_a, 1.0747, 0.001));
         assert!(near_equal(times.t_v, 0., 0.001));
         assert!(near_equal(times.t_d, 1.1747, 0.001));
@@ -540,7 +515,7 @@ mod tests {
             start_conditions,
         };
         let times = input.calc_intervals();
-        let near_equal = |a: f64, b: f64, epsilon: f64| f64::abs(a - b) < epsilon;
+        let near_equal = |a: f32, b: f32, epsilon: f32| f32::abs(a - b) < epsilon;
         assert!(near_equal(times.t_a, 0.4666, 0.001));
         assert!(near_equal(times.t_v, 0., 0.001));
         assert!(near_equal(times.t_d, 1.4718, 0.001));
@@ -566,39 +541,11 @@ mod tests {
             start_conditions,
         };
         let times = input.calc_intervals();
-        let near_equal = |a: f64, b: f64, epsilon: f64| f64::abs(a - b) < epsilon;
+        let near_equal = |a: f32, b: f32, epsilon: f32| f32::abs(a - b) < epsilon;
         assert!(near_equal(times.t_a, 0., 0.001));
         assert!(near_equal(times.t_v, 0., 0.001));
         assert!(near_equal(times.t_d, 2.6667, 0.001));
         assert!(near_equal(times.t_j1, 0., 0.001));
         assert!(near_equal(times.t_j2, 0.0973, 0.001));
-    }
-
-    #[test]
-    fn simple_curve() {
-        let constraints = SCurveConstraints {
-            max_jerk: 30.,
-            max_acceleration: 10.0,
-            max_velocity: 5.,
-        };
-        let start_conditions = SCurveStartConditions {
-            q0: 0.,
-            q1: 10.,
-            v0: 1.,
-            v1: 0.,
-        };
-        let input = SCurveInput {
-            constraints,
-            start_conditions,
-        };
-        let s_curve_tmp = s_curve_generator(&input, Derivative::Position);
-        let s_curve = s_curve_tmp.1;
-        let params = s_curve_tmp.0;
-        for i in 0..101 {
-            println!(
-                "{}",
-                s_curve(i as f64 * params.time_intervals.total_duration() / 100.)
-            );
-        }
     }
 }

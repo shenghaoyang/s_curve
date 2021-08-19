@@ -1,5 +1,5 @@
 [package]
-name = "s_curve"
+name = "s_curve_tiny"
 version = "0.1.6"
 authors = ["Marco Boneberger <m.boneberger@tu-bs.de>"]
 edition = "2018"
@@ -16,10 +16,12 @@ documentation = "https://docs.rs/s_curve/"
 name = "s_curve"
 path = "src/lib.rs"
 
-[[example]]
-name = "plot"
-path = "examples/plot.rs"
-
 [dependencies]
+libm = "0.2.1"
+
+[dependencies.num-traits]
+version = "0.2"
+default-features = false
+
 [dev-dependencies]
 gnuplot = "0.0.37"
