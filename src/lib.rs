@@ -11,10 +11,9 @@
 * The notation follows loosely the book
 * "Trajectory Planning for Automatic Machinesand Robots" by Luigi Biagotti and Claudio Melchiorri
 */
-// `no_std` f32 math implementation.
-use libm;
 use serde::{Deserialize, Serialize};
 
+/// `no_std` f32 math extension.
 trait F32Ext: Sized {
     fn abs(self) -> f32;
     fn powi(self, i: u32) -> f32;
@@ -40,7 +39,7 @@ impl F32Ext for f32 {
  *  These are only the limits. It can happen that the acceleration or Velocity will be actually lower
  *  after the S-Curve has been calculated. The actual maximum values are in the SCurveParameters struct
  */
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct SCurveConstraints {
     pub max_jerk: f32,
     pub max_acceleration: f32,
@@ -57,7 +56,7 @@ pub enum Derivative {
 }
 
 /// Represents the different time intervals of the S-Curve
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct SCurveTimeIntervals {
     ///  time-interval in which the jerk is constant (j max or j min ) during the acceleration phase
     pub t_j1: f32,
@@ -82,7 +81,7 @@ impl SCurveTimeIntervals {
 }
 
 /// Represents the Start and End Positions of the S_Curve
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SCurveStartConditions {
     /// start position
     pub q0: f32,
@@ -113,7 +112,7 @@ impl SCurveStartConditions {
 }
 
 /// Struct which represents the final parametrization of the S-Curve
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SCurveParameters {
     /// tine intervals of the Trajectory
     pub time_intervals: SCurveTimeIntervals,
@@ -149,7 +148,7 @@ impl SCurveParameters {
 }
 
 /// Struct which represent the input which is needed so that the S-Curve can be calculated
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct SCurveInput {
     pub constraints: SCurveConstraints,
     pub start_conditions: SCurveStartConditions,
